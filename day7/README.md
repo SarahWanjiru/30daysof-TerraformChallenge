@@ -138,12 +138,12 @@ This is how a real multi-layer architecture works — a networking layer outputs
 
 | | Workspaces | File Layout |
 |---|---|---|
-| Code isolation | ❌ Same code for all envs | ✅ Each env has its own code |
-| State isolation | ✅ Separate state per workspace | ✅ Separate state per directory |
-| Risk of wrong env apply | ⚠️ High — easy to forget to switch | ✅ Low — you `cd` into the right dir |
-| Scales across large teams | ❌ Fragile at scale | ✅ Recommended for production |
-| Backend config overhead | ✅ One backend config | ⚠️ Repeated per environment |
-| Supports env-specific code | ❌ No | ✅ Yes |
+| Code isolation |  Same code for all envs |  Each env has its own code |
+| State isolation |  Separate state per workspace |  Separate state per directory |
+| Risk of wrong env apply | High — easy to forget to switch |  Low — you `cd` into the right dir |
+| Scales across large teams |  Fragile at scale |  Recommended for production |
+| Backend config overhead |  One backend config |  Repeated per environment |
+| Supports env-specific code |  No | Yes |
 
 **Recommendation:** Use file layouts for anything production. Workspaces are fine for quick experiments or when environments are truly identical. The risk of running `terraform apply` in the wrong workspace is real — file layouts make that mistake structurally impossible.
 
