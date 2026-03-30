@@ -5,7 +5,7 @@ provider "aws" {
 terraform {
   backend "s3" {
     bucket         = "sarahcodes-terraform-state-2026"
-    key            = "day8/dev/services/webserver-cluster/terraform.tfstate"
+    key            = "day9/dev/services/webserver-cluster/terraform.tfstate"
     region         = "eu-north-1"
     dynamodb_table = "sarahcodes-terraform-locks"
     encrypt        = true
