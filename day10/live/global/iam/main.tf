@@ -37,25 +37,25 @@ variable "users" {
   }
 }
 
-# count example — 3 identical users
+# count example 3 identical users
 resource "aws_iam_user" "count_example" {
   count = 3
   name  = "sarahcodes-user-${count.index}"
 }
 
-# count with list — fragile pattern
+# count with list fragile pattern
 resource "aws_iam_user" "list_example" {
   count = length(var.user_names)
   name  = var.user_names[count.index]
 }
 
-# for_each with set — safe pattern
+# for_each with set safe pattern
 resource "aws_iam_user" "foreach_set_example" {
   for_each = var.safe_user_names
   name     = each.value
 }
 
-# for_each with map — extra data per user
+# for_each with map extra data per user
 resource "aws_iam_user" "foreach_map_example" {
   for_each = var.users
   name     = each.key
