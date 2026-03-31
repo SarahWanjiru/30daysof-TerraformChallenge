@@ -6,7 +6,7 @@ Went deep on Terraform conditionals — refactored the webserver cluster module 
 environment-aware using a single `environment` variable that drives instance sizing, cluster
 size, and monitoring decisions through a `locals` block. Added a CloudWatch CPU alarm as a
 conditionally created resource, added input validation, and documented the brownfield/greenfield
-VPC pattern.
+VPC pattern. Deployed both dev and production and confirmed the conditional logic works correctly.
 
 ---
 
@@ -15,18 +15,18 @@ VPC pattern.
 ```
 day11/
 ├── live/
-│   ├── global/iam/                          # from day10 — loops reference
-│   ├── dev/services/webserver-cluster/      # environment = "dev", monitoring off
-│   └── production/services/webserver-cluster/  # environment = "production", monitoring on
-└── modules/services/webserver-cluster/      # fully environment-aware module
+│   ├── global/iam/                              # day10 loops reference
+│   ├── dev/services/webserver-cluster/          # environment = "dev"
+│   └── production/services/webserver-cluster/  # environment = "production"
+└── modules/services/webserver-cluster/          # fully environment-aware module
 ```
 
 ---
 
-## Locals-Centralised Conditional Logic
+## Pattern 1 — Locals-Centralised Conditional Logic
 
-All conditional decisions live in one `locals` block at the top of the module.
-Resources read from locals — never raw ternary operators inline.
+All conditional decisions live in one `locals` block. Resources read from locals — no raw
+ternary operators inside resource arguments.
 
 ```hcl
 locals {
@@ -48,7 +48,7 @@ Resources then reference locals cleanly:
 
 ```hcl
 resource "aws_launch_template" "web" {
-  instance_type = local.actual_instance_type   # never a ternary here
+  instance_type = local.actual_instance_type
 }
 
 resource "aws_autoscaling_group" "web" {
@@ -58,19 +58,86 @@ resource "aws_autoscaling_group" "web" {
 }
 ```
 
-**Why this is better than scattering ternaries across resource arguments:**
-- All conditional logic is in one place — one read to understand all environment differences
-- Resources stay readable — `instance_type = local.actual_instance_type` is clear
-- Easier to test — change one local, all downstream resources update
-- Easier to extend — add a new environment tier by editing the locals block only
+Why this matters — if the production instance type needs to change, one line in `locals` updates
+it everywhere. No hunting through resource arguments.
 
 ---
 
-## Conditional Resource Creation
-
-### Autoscaling policies — toggled by `enable_autoscaling`
+## Pattern 2 — Input Validation Block
 
 ```hcl
+variable "environment" {
+  description = "Deployment environment: dev, staging, or production"
+  type        = string
+  default     = "dev"
+
+  validation {
+    condition     = contains(["dev", "staging", "production"], var.environment)
+    error_message = "Environment must be dev, staging, or production."
+  }
+}
+```
+
+To make the validation testable from the command line, a root-level `environment` variable was
+added to the dev calling config that passes through to the module:
+
+```hcl
+# live/dev/services/webserver-cluster/main.tf
+variable "environment" {
+  description = "Deployment environment passed through to module validation"
+  type        = string
+  default     = "dev"
+}
+
+module "webserver_cluster" {
+  source      = "../../../../modules/services/webserver-cluster"
+  environment = var.environment   # now overridable via -var
+  ...
+}
+```
+
+**Validation error when passing an invalid value:**
+
+```
+$ terraform plan -var="environment=prod"
+
+╷
+│ Error: Invalid value for variable
+│
+│   on ../../../../modules/services/webserver-cluster/variables.tf line 42,
+│   in variable "environment":
+│   42:   validation {
+│
+│ Environment must be dev, staging, or production.
+│
+│ This was checked by the validation rule at variables.tf:43,5-15.
+╵
+```
+
+Fires at plan time — before any API calls. Without this, `"prod"` would silently deploy with
+dev-sized resources.
+
+**First attempt error — before the fix:**
+
+```
+$ terraform plan -var="environment=prod"
+
+╷
+│ Error: Value for undeclared variable
+│
+│ A variable named "environment" was assigned on the command line, but the root
+│ module does not declare a variable of that name.
+╵
+```
+
+Fix: added the root-level `variable "environment"` block so `-var` has somewhere to land.
+
+---
+
+## Pattern 3 — Conditional Resource Creation
+
+```hcl
+# autoscaling policies — skipped entirely when enable_autoscaling = false
 resource "aws_autoscaling_policy" "scale_out" {
   count = var.enable_autoscaling ? 1 : 0
 
@@ -92,11 +159,8 @@ resource "aws_autoscaling_policy" "scale_in" {
   scaling_adjustment     = -1
   cooldown               = 300
 }
-```
 
-### CloudWatch CPU alarm — toggled by `local.actual_monitoring`
-
-```hcl
+# CloudWatch alarm — uses local.actual_monitoring so production always gets it
 resource "aws_cloudwatch_metric_alarm" "high_cpu" {
   count = local.actual_monitoring ? 1 : 0
 
@@ -116,41 +180,34 @@ resource "aws_cloudwatch_metric_alarm" "high_cpu" {
 }
 ```
 
-**Plan output — dev (enable_autoscaling = false, enable_detailed_monitoring = false):**
+**Dev plan — 7 resources, no alarm, no scaling policies:**
 
 ```
-# module.webserver_cluster.aws_autoscaling_policy.scale_in will not be created
-  ~ count = 0
+Plan: 7 to add, 0 to change, 0 to destroy.
 
-# module.webserver_cluster.aws_autoscaling_policy.scale_out will not be created
-  ~ count = 0
-
-# module.webserver_cluster.aws_cloudwatch_metric_alarm.high_cpu will not be created
-  ~ count = 0
+instance_type_used = "t3.micro"
+min_size_used      = 1
+max_size_used      = 3
+cloudwatch_alarm_arn = null
 ```
 
-**Plan output — production (enable_autoscaling = true, environment = "production"):**
+**Production plan — 10 resources, alarm created, scaling policies created:**
 
 ```
-# module.webserver_cluster.aws_autoscaling_policy.scale_in will be created
-  + name = "webservers-production-scale-in"
+Plan: 10 to add, 0 to change, 0 to destroy.
 
-# module.webserver_cluster.aws_autoscaling_policy.scale_out will be created
-  + name = "webservers-production-scale-out"
-
-# module.webserver_cluster.aws_cloudwatch_metric_alarm.high_cpu will be created
-  + alarm_name = "webservers-production-high-cpu"
-  + threshold  = 80
+instance_type_used   = "t3.small"
+min_size_used        = 3
+max_size_used        = 10
+cloudwatch_alarm_arn = "arn:aws:cloudwatch:eu-north-1:629836545449:alarm:webservers-production-high-cpu"
 ```
 
 ---
 
-## Safe Output References
+## Pattern 4 — Safe Output References
 
 ```hcl
-# SAFE — autoscaling policy ARNs
-# for expression over concat() produces an empty map {} when count = 0
-# no crash, no null reference error
+# SAFE — for expression over concat() returns empty map {} when count = 0
 output "autoscaling_policy_arns" {
   description = "Map of autoscaling policy ARNs — empty when disabled"
   value = {
@@ -161,171 +218,100 @@ output "autoscaling_policy_arns" {
   }
 }
 
-# SAFE — CloudWatch alarm ARN
-# ternary guard returns null when monitoring is disabled
-# [0] accesses the single instance when count = 1
+# SAFE — ternary guard returns null when monitoring is disabled
 output "cloudwatch_alarm_arn" {
   description = "The ARN of the CloudWatch CPU alarm — null when monitoring disabled"
   value       = local.actual_monitoring ? aws_cloudwatch_metric_alarm.high_cpu[0].arn : null
 }
 ```
 
-**What happens without the ternary guard:**
+Without the ternary guard:
 
 ```hcl
-# WRONG — crashes when count = 0
+# BROKEN — crashes at plan time when count = 0
 output "cloudwatch_alarm_arn" {
   value = aws_cloudwatch_metric_alarm.high_cpu[0].arn
 }
 # Error: Invalid index
-# The given key does not identify an element in this collection value.
-# aws_cloudwatch_metric_alarm.high_cpu is empty (count = 0)
+# aws_cloudwatch_metric_alarm.high_cpu is empty tuple
 ```
 
-Terraform evaluates outputs even when the resource doesn't exist. The `[0]` index on an empty
-list causes a plan-time error. The ternary guard short-circuits evaluation — when the condition
-is false, Terraform never tries to access `[0]`.
+Terraform evaluates outputs even when the resource doesn't exist. The `[0]` on an empty list
+causes a plan-time crash. The ternary guard short-circuits — when false, Terraform never
+evaluates `[0]`.
 
 ---
 
-## Environment-Aware Module
-
-### Input validation block
+## Pattern 5 — Conditional Data Source Lookups
 
 ```hcl
-variable "environment" {
-  description = "Deployment environment: dev, staging, or production"
-  type        = string
-  default     = "dev"
-
-  validation {
-    condition     = contains(["dev", "staging", "production"], var.environment)
-    error_message = "Environment must be dev, staging, or production."
-  }
-}
-```
-
-**How to trigger the validation error:**
-
-A root-level `environment` variable was added to the dev calling config so it can be overridden
-from the command line and passed through to the module's validation block:
-
-```hcl
-# live/dev/services/webserver-cluster/main.tf
-variable "environment" {
-  description = "Deployment environment — passed through to module validation"
-  type        = string
-  default     = "dev"
-}
-
-module "webserver_cluster" {
-  source      = "../../../../modules/services/webserver-cluster"
-  cluster_name = "webservers-dev"
-  environment  = var.environment   # now overridable via -var
-}
-```
-
-Passing an invalid value now correctly triggers the module's validation block:
-
-```
-$ terraform plan -var="environment=prod"
-
-╷
-│ Error: Invalid value for variable
-│
-│   on ../../../../modules/services/webserver-cluster/variables.tf line 42,
-│   in variable "environment":
-│   42:   validation {
-│
-│ Environment must be dev, staging, or production.
-│
-│ This was checked by the validation rule at variables.tf:43,5-15.
-╵
-```
-
-The error fires before any API calls are made. Without validation, `"prod"` would silently be
-treated as a non-production environment and deploy with dev-sized resources.
-
-### Dev calling configuration
-
-```hcl
-module "webserver_cluster" {
-  source = "../../../../modules/services/webserver-cluster"
-
-  cluster_name               = "webservers-dev"
-  instance_type              = "t3.micro"
-  environment                = "dev"
-  enable_autoscaling         = false
-  enable_detailed_monitoring = false
-}
-```
-
-### Production calling configuration
-
-```hcl
-module "webserver_cluster" {
-  source = "../../../../modules/services/webserver-cluster"
-
-  cluster_name               = "webservers-production"
-  instance_type              = "t3.micro"   # overridden by locals — actual = t3.small
-  environment                = "production"
-  enable_autoscaling         = true
-  enable_detailed_monitoring = true
-}
-```
-
-### Plan diff between dev and production
-
-| Resource / Setting | Dev | Production |
-|---|---|---|
-| `instance_type` | t3.micro | t3.small (overridden by locals) |
-| ASG `min_size` | 1 | 3 |
-| ASG `max_size` | 3 | 10 |
-| `aws_autoscaling_policy.scale_out` | not created | created |
-| `aws_autoscaling_policy.scale_in` | not created | created |
-| `aws_cloudwatch_metric_alarm.high_cpu` | not created | created |
-
----
-
-## Conditional Data Source Pattern
-
-```hcl
-# variables.tf
 variable "use_existing_vpc" {
   description = "Use an existing VPC instead of the default"
   type        = bool
   default     = false
 }
 
-# main.tf — brownfield: look up existing VPC only when requested
+# brownfield — look up existing VPC only when requested
 data "aws_vpc" "existing" {
   count = var.use_existing_vpc ? 1 : 0
-  tags = {
-    Name = "existing-vpc"
-  }
+  tags  = { Name = "existing-vpc" }
 }
 
-# greenfield: create a new VPC only when not using existing
+# greenfield — create new VPC only when not using existing
 resource "aws_vpc" "new" {
   count      = var.use_existing_vpc ? 0 : 1
   cidr_block = "10.0.0.0/16"
 }
 
-# single local resolves which VPC ID to use downstream
+# single local — all downstream resources just use local.vpc_id
 locals {
   vpc_id = var.use_existing_vpc ? data.aws_vpc.existing[0].id : aws_vpc.new[0].id
 }
 ```
 
-**Greenfield** (`use_existing_vpc = false`): Terraform creates a new VPC. Use this for fresh
-environments with no existing infrastructure.
+- Greenfield (`use_existing_vpc = false`) — fresh AWS account, Terraform creates the VPC
+- Brownfield (`use_existing_vpc = true`) — existing account, Terraform looks up the VPC by tag
 
-**Brownfield** (`use_existing_vpc = true`): Terraform looks up an existing VPC by tag and uses
-its ID. Use this when deploying into an account that already has networking set up — avoids
-creating duplicate VPCs and conflicting CIDR ranges.
+Same module, one boolean toggle, works in both scenarios.
 
-The `local.vpc_id` abstraction means every resource downstream just references `local.vpc_id`
-and works correctly in both cases without any changes.
+---
+
+## Real Deployment Outputs
+
+### Dev (`environment = "dev"`, `enable_autoscaling = false`, `enable_detailed_monitoring = false`)
+
+```
+Apply complete! Resources: 7 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+alb_dns_name         = "webservers-dev-alb-1330238721.eu-north-1.elb.amazonaws.com"
+instance_type_used   = "t3.micro"
+min_size_used        = 1
+max_size_used        = 3
+cloudwatch_alarm_arn = null
+```
+
+### Production (`environment = "production"`, `enable_autoscaling = true`, `enable_detailed_monitoring = true`)
+
+```
+Apply complete! Resources: 10 added, 0 changed, 0 destroyed.
+
+Outputs:
+
+alb_dns_name         = "webservers-production-alb-1211147999.eu-north-1.elb.amazonaws.com"
+instance_type_used   = "t3.small"
+min_size_used        = 3
+max_size_used        = 10
+cloudwatch_alarm_arn = "arn:aws:cloudwatch:eu-north-1:629836545449:alarm:webservers-production-high-cpu"
+```
+
+Key differences proven by the real outputs:
+- Instance type: `t3.micro` → `t3.small` (driven by `is_production` local, not the caller)
+- Min size: `1` → `3`
+- Max size: `3` → `10`
+- CloudWatch alarm: `null` → real ARN
+- Resource count: `7` → `10` (3 extra: scale_out policy, scale_in policy, CloudWatch alarm)
 
 ---
 
@@ -333,48 +319,36 @@ and works correctly in both cases without any changes.
 
 **Conditional expression vs conditional resource creation:**
 
-A conditional expression (`condition ? a : b`) is just a value — it evaluates to one of two
-values at plan time. It doesn't create or destroy anything. You use it inside arguments:
-`instance_type = local.is_production ? "t3.small" : "t3.micro"`.
+A conditional expression (`condition ? a : b`) picks a value — it doesn't create or destroy
+anything. `instance_type = local.is_production ? "t3.small" : "t3.micro"` just selects a string.
 
-Conditional resource creation (`count = condition ? 1 : 0`) controls whether a resource block
-produces an actual AWS resource. When `count = 0`, the resource block exists in the config but
-Terraform creates nothing. These are different tools — one picks a value, the other decides
-whether to create infrastructure.
+Conditional resource creation (`count = condition ? 1 : 0`) controls whether AWS infrastructure
+gets created at all. When `count = 0` the block exists in config but Terraform creates nothing.
 
 **Can you use a conditional to choose between two different resource types?**
 
-No. A ternary expression can only choose between two values of the same type — you can't write
-`count = condition ? aws_instance.web : aws_ecs_service.web`. Terraform's type system requires
-both branches to be the same type. To conditionally use different resource types, you use
-`count = 0/1` on each resource type separately and reference whichever one was created.
+No. Both branches of a ternary must be the same type. You can't write
+`count = condition ? aws_instance.web : aws_ecs_service.app`. To conditionally use different
+resource types, use `count = 0/1` on each separately and reference whichever was created.
 
 ---
 
 ## Challenges and Fixes
 
-- **`terraform init` context deadline exceeded** — registry.terraform.io was unreachable on
-  first attempt. Confirmed internet was working (`ping 8.8.8.8` succeeded, `curl` to the
-  registry also succeeded). Retried `terraform init` and it worked — was a transient timeout.
+- **`Value for undeclared variable` when testing validation** — ran
+  `terraform plan -var="environment=prod"` expecting the module validation to fire. Got
+  `Value for undeclared variable` because `environment` was hardcoded in the module call.
+  Fix: added a root-level `variable "environment"` block with `default = "dev"` and changed
+  the module call to `environment = var.environment`. The `-var` flag now passes through to
+  the module and triggers the validation correctly.
 
-- **`[0]` index error on disabled CloudWatch alarm** — first version of the output used
-  `aws_cloudwatch_metric_alarm.high_cpu[0].arn` directly. Got `Invalid index` error at plan
-  time when `enable_detailed_monitoring = false`. Fixed by wrapping in the ternary guard:
-  `local.actual_monitoring ? aws_cloudwatch_metric_alarm.high_cpu[0].arn : null`.
+- **Production needed `terraform init` before `terraform plan`** — forgot that each environment
+  directory needs its own `terraform init` since they have separate backends. Ran `terraform init`
+  then `terraform apply` and it worked.
 
-- **`local.actual_monitoring` vs `var.enable_detailed_monitoring`** — initially used the
-  variable directly in the `count` expression. Realised production should always have monitoring
-  on regardless of what the caller passes. Moved the decision into `locals` so
-  `actual_monitoring = local.is_production ? true : var.enable_detailed_monitoring` — production
-  always gets monitoring, dev only gets it if explicitly enabled.
-
-- **Validation block — `Value for undeclared variable` instead of expected error** — ran
-  `terraform plan -var="environment=prod"` from the root `live/dev` directory expecting the
-  module validation to fire. Got `Value for undeclared variable` instead because `environment`
-  was hardcoded in the module call (`environment = "dev"`), not exposed as a root variable.
-  Fix: added a root-level `environment` variable with `default = "dev"` and changed the module
-  call to `environment = var.environment`. Now `-var="environment=prod"` passes through to the
-  module and the validation block fires correctly.
+- **`cloudwatch_alarm_arn` output missing from dev** — dev outputs didn't show
+  `cloudwatch_alarm_arn` at first. Confirmed it returns `null` when `enable_detailed_monitoring
+  = false` — this is correct behaviour, not a bug.
 
 ---
 
@@ -382,11 +356,14 @@ both branches to be the same type. To conditionally use different resource types
 
 URL: *(paste blog URL here)*
 
-Covered the full conditional toolkit: ternary expressions, `count = condition ? 1 : 0`,
-safe output references with `[0]` guards, input validation blocks, and the environment-aware
-locals pattern. Led with the problem — scattered ternaries in resource arguments — then showed
-how centralising in `locals` fixes it. Included the brownfield/greenfield VPC pattern as the
-practical data source conditional example.
+Title: **How Conditionals Make Terraform Infrastructure Dynamic and Efficient**
+
+Covered all five conditional patterns with real code and real deployment outputs. Led with the
+problem — scattered ternaries in resource arguments — then showed how centralising in `locals`
+with `is_production` as a single source of truth fixes it. Included the actual dev vs production
+output diff as proof the conditionals work. Documented both real errors hit during the day —
+the `[0]` index crash and the `Value for undeclared variable` error — with the exact terminal
+output and the fix for each.
 
 ---
 
