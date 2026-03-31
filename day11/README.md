@@ -205,7 +205,27 @@ variable "environment" {
 }
 ```
 
-**Error when passing an invalid value:**
+**How to trigger the validation error:**
+
+A root-level `environment` variable was added to the dev calling config so it can be overridden
+from the command line and passed through to the module's validation block:
+
+```hcl
+# live/dev/services/webserver-cluster/main.tf
+variable "environment" {
+  description = "Deployment environment — passed through to module validation"
+  type        = string
+  default     = "dev"
+}
+
+module "webserver_cluster" {
+  source      = "../../../../modules/services/webserver-cluster"
+  cluster_name = "webservers-dev"
+  environment  = var.environment   # now overridable via -var
+}
+```
+
+Passing an invalid value now correctly triggers the module's validation block:
 
 ```
 $ terraform plan -var="environment=prod"
@@ -213,7 +233,8 @@ $ terraform plan -var="environment=prod"
 ╷
 │ Error: Invalid value for variable
 │
-│   on variables.tf line 42, in variable "environment":
+│   on ../../../../modules/services/webserver-cluster/variables.tf line 42,
+│   in variable "environment":
 │   42:   validation {
 │
 │ Environment must be dev, staging, or production.
@@ -222,8 +243,8 @@ $ terraform plan -var="environment=prod"
 ╵
 ```
 
-The error fires at plan time — before any API calls are made. Without validation, `"prod"` would
-silently be treated as a non-production environment and deploy with dev-sized resources.
+The error fires before any API calls are made. Without validation, `"prod"` would silently be
+treated as a non-production environment and deploy with dev-sized resources.
 
 ### Dev calling configuration
 
@@ -347,9 +368,13 @@ both branches to be the same type. To conditionally use different resource types
   `actual_monitoring = local.is_production ? true : var.enable_detailed_monitoring` — production
   always gets monitoring, dev only gets it if explicitly enabled.
 
-- **Validation block rejecting `"prod"`** — tested passing `environment = "prod"` and confirmed
-  the validation fires immediately at plan time with the correct error message. This is the
-  intended behaviour.
+- **Validation block — `Value for undeclared variable` instead of expected error** — ran
+  `terraform plan -var="environment=prod"` from the root `live/dev` directory expecting the
+  module validation to fire. Got `Value for undeclared variable` instead because `environment`
+  was hardcoded in the module call (`environment = "dev"`), not exposed as a root variable.
+  Fix: added a root-level `environment` variable with `default = "dev"` and changed the module
+  call to `environment = var.environment`. Now `-var="environment=prod"` passes through to the
+  module and the validation block fires correctly.
 
 ---
 

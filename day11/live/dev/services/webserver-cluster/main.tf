@@ -12,12 +12,18 @@ terraform {
   }
 }
 
+variable "environment" {
+  description = "Deployment environment passed through to module validation"
+  type        = string
+  default     = "dev"
+}
+
 module "webserver_cluster" {
   source = "../../../../modules/services/webserver-cluster"
 
   cluster_name               = "webservers-dev"
   instance_type              = "t3.micro"
-  environment                = "dev"
+  environment                = var.environment
   enable_autoscaling         = false
   enable_detailed_monitoring = false
 }
