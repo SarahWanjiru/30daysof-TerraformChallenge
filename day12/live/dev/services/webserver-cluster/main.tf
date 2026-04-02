@@ -29,8 +29,8 @@ module "webserver_cluster" {
 
   # DAY 12 — change app_version to "v2" to trigger zero-downtime rolling update
   # DAY 12 — change active_environment to "green" to do blue/green switch
-  app_version        = "v1"
-  active_environment = "blue"
+  app_version        = "v2"
+  active_environment = "green"
 }
 
 output "alb_dns_name" {
