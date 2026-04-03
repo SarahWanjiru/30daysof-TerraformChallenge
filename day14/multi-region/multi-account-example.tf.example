@@ -1,0 +1,18 @@
+# Multi-account provider pattern
+# Replace ACCOUNT_ID with the target AWS account number
+# TerraformDeployRole must exist in that account and trust this account
+
+provider "aws" {
+  alias  = "staging"
+  region = "eu-north-1"
+
+  assume_role {
+    role_arn = "arn:aws:iam::ACCOUNT_ID:role/TerraformDeployRole"
+  }
+}
+
+# example resource deployed into the staging account
+# resource "aws_s3_bucket" "staging" {
+#   provider = aws.staging
+#   bucket   = "sarahcodes-staging-bucket"
+# }
