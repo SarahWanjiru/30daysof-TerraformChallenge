@@ -64,7 +64,7 @@ module "eks" {
   version = "~> 20.0"
 
   cluster_name    = "sarahcodes-eks"
-  cluster_version = "1.29"
+  cluster_version = "1.32"
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
@@ -83,39 +83,6 @@ module "eks" {
   tags = {
     Environment = "dev"
     Challenge   = "30DayTerraform"
-  }
-}
-
-# nginx deployment on the EKS cluster
-resource "kubernetes_deployment" "nginx" {
-  metadata {
-    name   = "nginx-deployment"
-    labels = { app = "nginx" }
-  }
-
-  spec {
-    replicas = 2
-
-    selector {
-      match_labels = { app = "nginx" }
-    }
-
-    template {
-      metadata {
-        labels = { app = "nginx" }
-      }
-
-      spec {
-        container {
-          image = "nginx:latest"
-          name  = "nginx"
-
-          port {
-            container_port = 80
-          }
-        }
-      }
-    }
   }
 }
 
