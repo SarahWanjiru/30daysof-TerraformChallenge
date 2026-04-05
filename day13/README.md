@@ -92,7 +92,7 @@ terraform {
 ```bash
 aws secretsmanager create-secret \
   --name "day13/db/credentials" \
-  --secret-string '{"username":"dbadmin","password":"SecurePass123!"}' \
+  --secret-string '{"username":"dbadmin","password":"<your-secure-password>"}' \
   --region eu-north-1
 ```
 
@@ -187,7 +187,7 @@ contains the plaintext value. This is why state file encryption is required.
 ## Proof the Secret Is Not in Code
 
 ```bash
-$ grep -r "SecurePass123" ~/Desktop/30daysof-TerraformChallenge/day13/
+$ grep -r "<your-secure-password>" ~/Desktop/30daysof-TerraformChallenge/day13/
 # returns nothing — secret exists nowhere in the codebase
 
 $ grep -r "dbadmin" ~/Desktop/30daysof-TerraformChallenge/day13/live/global/secrets/.terraform/
