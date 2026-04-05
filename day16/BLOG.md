@@ -291,6 +291,38 @@ Maintainability — ✅ all passing
 The gap was smaller than I expected. The patterns from Days 11-15 — create_before_destroy, validation blocks, sensitive = true, encrypted state — were already on the checklist. The checklist is not a new set of things to learn. It is a way of verifying that the things you have been learning are actually applied consistently.
 
 
+7. The CI Pipeline Errors
+
+Setting up the GitHub Actions pipeline hit three errors worth documenting.
+
+Error 1 — terraform fmt failing on old files
+
+The fmt check ran against the entire repo and failed on unformatted files from days 3-12.
+Fixed by scoping it to day16/ only.
+
+Error 2 — missing id on the plan step
+
+The post-plan comment step referenced steps.plan.outputs.stdout but the plan step had no
+id field. GitHub Actions could not find the step. Fixed by adding id: plan.
+
+Error 3 — Secrets Manager secret deleted
+
+The day13/db/credentials secret had been deleted after the password was accidentally
+published in the blog. The pipeline failed with:
+
+couldn't find resource
+  with module.webserver_cluster.data.aws_secretsmanager_secret.db_credentials
+
+AWS puts deleted secrets into a scheduled deletion window — you cannot create a new secret
+with the same name until the window expires. Fixed by restoring the secret first:
+
+aws secretsmanager restore-secret --secret-id "day13/db/credentials" --region eu-north-1
+aws secretsmanager put-secret-value --secret-id "day13/db/credentials" \
+  --secret-string '{"username":"dbadmin","password":"<new-password>"}'
+
+This is also why you never publish real passwords in blog posts — even as examples.
+
+
 Key Lessons Learned
 
 - Consistent tagging with merge(local.common_tags, {...}) costs almost nothing to implement and makes the entire infrastructure auditable

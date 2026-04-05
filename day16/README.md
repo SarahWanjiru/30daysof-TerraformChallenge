@@ -7,7 +7,7 @@ Chapter 8. Identified every gap and closed them: added consistent tagging with `
 `prevent_destroy` on the ALB, SNS alerts wired to CloudWatch alarms, input validation on
 every constrained variable, and wrote a Terratest function for automated testing.
 
----
+
 
 ## Project Structure
 
@@ -23,7 +23,7 @@ day16/
     └── webserver_cluster_test.go  # Terratest automated test
 ```
 
----
+
 
 ## Production-Grade Checklist Audit
 
@@ -59,7 +59,7 @@ day16/
 - [x] `.terraform.lock.hcl` committed to version control
 - [x] `.gitignore` excludes state files, `.terraform/`, `*.tfvars`
 
----
+
 
 ## Top 3 Refactors
 
@@ -106,7 +106,7 @@ resource "aws_lb" "web" {
 `merge()` combines the common tags with the resource-specific `Name` tag. Change `project_name`
 or `team_name` once in the calling config — every resource updates automatically.
 
----
+
 
 ### Refactor 2 — prevent_destroy on the ALB
 
@@ -135,7 +135,7 @@ forces ALB recreation would take down the load balancer — and all traffic with
 `prevent_destroy`, Terraform errors before touching the ALB. You must explicitly remove the
 lifecycle block to destroy it.
 
----
+
 
 ### Refactor 3 — SNS Topic Wired to CloudWatch Alarm
 
@@ -167,7 +167,7 @@ resource "aws_cloudwatch_metric_alarm" "high_cpu" {
 When CPU exceeds 80% for 4 minutes, the alarm fires and publishes to the SNS topic.
 Subscribe an email address or a Lambda function to the topic to receive the notification.
 
----
+
 
 ## Tagging Implementation
 
@@ -215,7 +215,7 @@ resource "aws_autoscaling_group" "web" {
 }
 ```
 
----
+
 
 ## Lifecycle Rules
 
@@ -235,7 +235,7 @@ lifecycle {
 }
 ```
 
----
+
 
 ## CloudWatch Alarms
 
@@ -271,7 +271,7 @@ fires only after 4 consecutive minutes above 80% — avoids false alarms from br
 When the alarm fires: publishes a message to the SNS topic. Subscribe an email or a PagerDuty
 endpoint to the topic to receive the notification.
 
----
+
 
 ## Input Validation
 
@@ -307,7 +307,7 @@ Instance type must be a t2 or t3 family type.
 
 Fires at plan time — before any API calls.
 
----
+
 
 ## GitHub Actions CI Pipeline
 
@@ -373,9 +373,25 @@ properly using `$GITHUB_OUTPUT`.
 
 Add these under: GitHub repo → Settings → Secrets and variables → Actions
 
----
+
 
 ## Terratest
+
+The Terratest function is written at `test/webserver_cluster_test.go`. The task states that
+running it is optional — writing it and understanding what it tests is the learning objective.
+
+Instead of running Terratest locally (which requires Go and deploys real AWS resources for
+every test run), I implemented a GitHub Actions CI pipeline that runs `terraform validate`
+and `terraform plan` automatically on every push. This gives the same confidence that the
+code is correct without the overhead of a full deploy-and-destroy cycle on every commit.
+
+Both approaches serve the same goal: catching broken infrastructure code before it reaches
+production. Terratest is more thorough — it deploys real resources and makes HTTP assertions.
+GitHub Actions is faster and cheaper — it catches syntax errors, type errors, and plan-time
+failures in seconds.
+
+For a real team I would use both: GitHub Actions on every PR for fast feedback, Terratest
+in a nightly pipeline for full end-to-end validation.
 
 ```go
 package test
@@ -424,7 +440,7 @@ What it does:
 `defer` is critical. Without it, a failed assertion would leave real AWS resources running
 and incurring cost. `defer` guarantees cleanup regardless of test outcome.
 
----
+
 
 ## Chapter 8 Learnings
 
@@ -440,11 +456,11 @@ The biggest surprise: how many items on the checklist I was already passing from
 blocks — all of those came from Days 11-15. The checklist is not a new set of things to learn.
 It is a way of verifying that the things you have been learning are actually applied consistently.
 
----
+
 
 ## Challenges and Fixes
 
-- **`prevent_destroy` blocks terraform destroy during testing** — added `prevent_destroy = true`
+- **prevent_destroy blocks terraform destroy during testing** — added `prevent_destroy = true`
   to the ALB then immediately tried to run `terraform destroy` to clean up. Terraform errored.
   This is the intended behaviour — had to temporarily remove the lifecycle block to destroy.
   In production this is a feature, not a bug.
@@ -458,22 +474,22 @@ It is a way of verifying that the things you have been learning are actually app
   `can(regex("^t[23]\\.", var.instance_type))` returns true only when the instance type
   starts with `t2.` or `t3.`.
 
----
+- **CI pipeline — terraform fmt failing on old days** — `terraform fmt -check -recursive`
+  ran against the entire repo and failed on unformatted files from days 3-12. Fixed by
+  scoping the fmt check to `day16/` only.
 
-## Blog Post
+- **CI pipeline — missing `id` on plan step** — the `Post plan to PR` step referenced
+  `steps.plan.outputs.stdout` but the plan step had no `id` field. GitHub Actions could not
+  find the step. Fixed by adding `id: plan` to the plan step.
 
-URL: *(paste blog URL here)*
+- **CI pipeline — Secrets Manager secret deleted** — the `day13/db/credentials` secret had
+  been deleted after it was published in the blog with a real password. The pipeline failed
+  with `couldn't find resource`. The secret was scheduled for deletion so `create-secret`
+  also failed. Fixed by restoring the secret first then updating the value:
+  ```bash
+  aws secretsmanager restore-secret --secret-id "day13/db/credentials" --region eu-north-1
+  aws secretsmanager put-secret-value --secret-id "day13/db/credentials" \
+    --secret-string '{"username":"dbadmin","password":"<new-password>"}' --region eu-north-1
+  ```
+  Also replaced the exposed password in the day13 README with a placeholder.
 
-Title: **Creating Production-Grade Infrastructure with Terraform**
-
----
-
-## Social Media
-
-URL: *(paste post URL here)*
-
-> 🚀 Day 16 of the 30-Day Terraform Challenge — production-grade infrastructure deep dive.
-> Audited my existing code against the full production checklist: consistent tagging,
-> lifecycle rules, CloudWatch alarms, input validation, Terratest. The gap between
-> "it works" and "it's production-ready" is significant.
-> #30DayTerraformChallenge #TerraformChallenge #Terraform #DevOps #IaC #AWSUserGroupKenya #EveOps

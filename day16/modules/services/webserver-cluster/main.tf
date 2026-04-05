@@ -171,6 +171,13 @@ resource "aws_autoscaling_policy" "scale_in" {
 }
 
 # SNS topic receives alarm notifications
+# log group with 30-day retention — satisfies the observability checklist item
+resource "aws_cloudwatch_log_group" "web" {
+  name              = "/aws/ec2/${var.cluster_name}"
+  retention_in_days = 30
+  tags              = merge(local.common_tags, { Name = "${var.cluster_name}-logs" })
+}
+
 resource "aws_sns_topic" "alerts" {
   name = "${var.cluster_name}-alerts"
   tags = merge(local.common_tags, { Name = "${var.cluster_name}-alerts" })

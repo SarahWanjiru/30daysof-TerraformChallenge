@@ -33,6 +33,11 @@ output "max_size_used" {
   description = "The actual max size used — affected by environment conditional"
 }
 
+output "log_group_name" {
+  value       = aws_cloudwatch_log_group.web.name
+  description = "CloudWatch log group name"
+}
+
 output "sns_topic_arn" {
   value       = aws_sns_topic.alerts.arn
   description = "ARN of the SNS topic that receives CloudWatch alarm notifications"
