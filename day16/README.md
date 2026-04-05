@@ -309,6 +309,72 @@ Fires at plan time — before any API calls.
 
 ---
 
+## GitHub Actions CI Pipeline
+
+Instead of Terratest (which requires Go), a GitHub Actions workflow runs automated
+checks on every push to main and every pull request.
+
+```yaml
+name: Terraform CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: eu-north-1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.11.0"
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+      - name: Validate day16 module
+        working-directory: day16/modules/services/webserver-cluster
+        run: |
+          terraform init -backend=false
+          terraform validate
+      - name: Plan day16 dev
+        id: plan
+        working-directory: day16/live/dev/services/webserver-cluster
+        run: |
+          terraform init
+          terraform plan -no-color | tee plan.txt
+          echo "stdout<<EOF" >> $GITHUB_OUTPUT
+          cat plan.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        continue-on-error: true
+```
+
+What each step does:
+- `terraform fmt -check -recursive` — fails if any file is not formatted correctly
+- `terraform init -backend=false` — initialises the module without connecting to S3
+- `terraform validate` — checks syntax and internal consistency without calling AWS
+- `terraform plan` — runs a real plan against AWS using the credentials from GitHub secrets
+
+**Error fixed during setup:**
+
+The original `Plan day16 dev` step had no `id` field. The `Post plan to PR` step referenced
+`${{ steps.plan.outputs.stdout }}` but GitHub Actions could not find the step because it had
+no id to reference. Fixed by adding `id: plan` to the plan step and capturing the output
+properly using `$GITHUB_OUTPUT`.
+
+**GitHub secrets required:**
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+
+Add these under: GitHub repo → Settings → Secrets and variables → Actions
+
+---
+
 ## Terratest
 
 ```go
