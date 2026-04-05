@@ -33,7 +33,7 @@ jobs:
 
       - name: Terraform Format Check
         run: terraform fmt -check -recursive
-        working-directory: .
+        working-directory: day16
 
       - name: Validate day16 module
         working-directory: day16/modules/services/webserver-cluster
