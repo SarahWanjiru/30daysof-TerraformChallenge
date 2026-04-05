@@ -51,7 +51,7 @@ day16/
 - [x] Consistent tagging on every resource using `merge(local.common_tags, {...})` — **added today**
 - [x] CloudWatch CPU alarm exists — from Day 11
 - [x] SNS topic wired to alarm actions — **added today**
-- [ ] Log groups with retention periods — not yet implemented
+- [x] Log groups created with 30-day retention period — **added today**
 
 ### Maintainability
 - [x] Every module has a README.md
