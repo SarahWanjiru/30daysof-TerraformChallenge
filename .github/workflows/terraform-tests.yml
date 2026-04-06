@@ -1,0 +1,96 @@
+name: Terraform Tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: eu-north-1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.11.0"
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+        working-directory: day18/modules/services/webserver-cluster
+
+      - name: Run Unit Tests
+        run: terraform test
+        working-directory: day18/modules/services/webserver-cluster
+
+  validate-and-plan:
+    name: Validate and Plan
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: eu-north-1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.11.0"
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        working-directory: day18
+
+      - name: Validate day18 module
+        working-directory: day18/modules/services/webserver-cluster
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Plan day18 dev
+        id: plan
+        working-directory: day18/live/dev/services/webserver-cluster
+        run: |
+          terraform init
+          terraform plan -no-color
+        env:
+          TF_VAR_db_secret_name: "day13/db/credentials"
+
+  # integration tests only run on push to main (after PR is merged)
+  # not on every PR — too slow and costly for every commit
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: unit-tests
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: eu-north-1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.11.0"
+
+      - name: Run Integration Tests
+        run: go test -v -timeout 30m ./...
+        working-directory: day18/test
