@@ -37,7 +37,7 @@ module "webserver_cluster" {
   team_name                  = "sarahcodes"
   enable_autoscaling         = false
   enable_detailed_monitoring = false
-  app_version                = "v1"
+  app_version                = "v2"
   active_environment         = "blue"
   db_secret_name             = "day13/db/credentials"
 }

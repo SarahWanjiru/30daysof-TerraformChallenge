@@ -211,10 +211,6 @@ resource "aws_lb" "web" {
   subnets            = data.aws_subnets.default.ids
 
   tags = merge(local.common_tags, { Name = "${var.cluster_name}-alb" })
-
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 resource "aws_lb_target_group" "blue" {
