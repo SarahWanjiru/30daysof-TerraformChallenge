@@ -8,7 +8,8 @@
 # Lock info (ephemeral)
 *.tfstate.lock.info
 
-# Crash logs
+# Terraform plan files — contain sensitive resource details, never commit
+*.tfplan
 crash.log
 crash.*.log
 
