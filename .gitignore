@@ -10,6 +10,7 @@
 
 # Terraform plan files — contain sensitive resource details, never commit
 *.tfplan
+crash.log
 crash.*.log
 
 # Override files
