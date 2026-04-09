@@ -1,0 +1,26 @@
+# sentinel/require-instance-type.sentinel
+#
+# Enforces that all aws_instance resources use approved instance types.
+# Blocks any plan that attempts to deploy an instance type outside the allowed list.
+# This prevents engineers from accidentally deploying expensive instance types
+# (e.g. m5.4xlarge) in any workspace governed by this policy.
+#
+# What it enforces:
+#   - Only t2.micro, t2.small, t2.medium, t3.micro, t3.small are permitted
+#   - Applies to every aws_instance resource change in the plan
+#   - Non-instance resources are not affected
+#
+# What it blocks:
+#   - Any aws_instance with instance_type outside the allowed list
+#   - Example: instance_type = "m5.xlarge" → policy FAIL → apply blocked
+
+import "tfplan/v2" as tfplan
+
+allowed_instance_types = ["t2.micro", "t2.small", "t2.medium", "t3.micro", "t3.small"]
+
+main = rule {
+  all tfplan.resource_changes as _, rc {
+    rc.type is not "aws_instance" or
+    rc.change.after.instance_type in allowed_instance_types
+  }
+}
