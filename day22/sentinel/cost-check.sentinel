@@ -1,0 +1,11 @@
+# sentinel/cost-check.sentinel
+# Blocks any plan where the estimated monthly cost increase exceeds $50.
+# Prevents accidental deployment of expensive infrastructure without explicit approval.
+
+import "tfrun"
+
+maximum_monthly_increase = 50.0
+
+main = rule {
+  tfrun.cost_estimate.delta_monthly_cost < maximum_monthly_increase
+}

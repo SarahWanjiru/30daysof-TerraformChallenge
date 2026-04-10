@@ -1,0 +1,14 @@
+# sentinel/require-instance-type.sentinel
+# Blocks any plan that uses an instance type outside the approved list.
+# Prevents engineers from accidentally deploying expensive instance types.
+
+import "tfplan/v2" as tfplan
+
+allowed_instance_types = ["t2.micro", "t2.small", "t2.medium", "t3.micro", "t3.small"]
+
+main = rule {
+  all tfplan.resource_changes as _, rc {
+    rc.type is not "aws_instance" or
+    rc.change.after.instance_type in allowed_instance_types
+  }
+}
