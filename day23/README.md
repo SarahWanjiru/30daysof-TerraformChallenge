@@ -6,26 +6,26 @@ Audited every exam domain honestly against the official study guide, built a str
 study plan for the remaining days, reviewed CLI commands, non-cloud providers, and
 Terraform Cloud capabilities, and wrote five original practice questions.
 
----
+
 
 ## Domain Audit
 
 | Domain | Weight | Rating | Notes |
 |---|---|---|---|
-| Understand IaC concepts | 16% | 🟢 Green | Built and explained IaC from Day 1 |
-| Understand Terraform's purpose | 20% | 🟢 Green | Providers, state, plan/apply cycle all hands-on |
-| Understand Terraform basics | 24% | 🟡 Yellow | Variables, outputs, locals solid — workspace isolation needs review |
-| Use the Terraform CLI | 26% | 🟡 Yellow | Core commands solid — state mv, state rm, taint need practice |
-| Interact with Terraform modules | 12% | 🟢 Green | Built, versioned, and published modules across 22 days |
-| Navigate the core Terraform workflow | 8% | 🟢 Green | Seven-step workflow executed end-to-end on Days 20-21 |
-| Implement and maintain state | 8% | 🟡 Yellow | S3 backend solid — state commands and workspace isolation need practice |
-| Read, generate, and modify configuration | 8% | 🟢 Green | count, for_each, conditionals, locals all hands-on |
-| Understand Terraform Cloud capabilities | 4% | 🟡 Yellow | Sentinel and cost estimation written — remote runs vs local runs needs review |
+| Understand IaC concepts | 16% |  Green | Built and explained IaC from Day 1 |
+| Understand Terraform's purpose | 20% |  Green | Providers, state, plan/apply cycle all hands-on |
+| Understand Terraform basics | 24% |  Yellow | Variables, outputs, locals solid — workspace isolation needs review |
+| Use the Terraform CLI | 26% |  Yellow | Core commands solid — state mv, state rm, taint need practice |
+| Interact with Terraform modules | 12% |  Green | Built, versioned, and published modules across 22 days |
+| Navigate the core Terraform workflow | 8% |  Green | Seven-step workflow executed end-to-end on Days 20-21 |
+| Implement and maintain state | 8% |  Yellow | S3 backend solid — state commands and workspace isolation need practice |
+| Read, generate, and modify configuration | 8% |  Green | count, for_each, conditionals, locals all hands-on |
+| Understand Terraform Cloud capabilities | 4% |  Yellow | Sentinel and cost estimation written — remote runs vs local runs needs review |
 
 **Summary:** 5 Green, 4 Yellow, 0 Red. Biggest gaps: CLI state commands and Terraform
 Cloud remote execution model.
 
----
+
 
 ## Study Plan — Days 24 to Exam
 
@@ -39,7 +39,7 @@ Cloud remote execution model.
 | Official sample questions | Yellow | Work through all official questions, add every miss to this table | 60 min |
 | Full mock exam | Yellow | Time-boxed 60-minute mock, review every wrong answer | 60 min |
 
----
+
 
 ## CLI Commands Self-Test
 
@@ -114,7 +114,7 @@ Authenticates to Terraform Cloud by storing a token locally. Use it before runni
 Outputs the dependency graph of resources in DOT format. Use it to visualise resource
 dependencies and debug unexpected ordering issues.
 
----
+
 
 ## Non-Cloud Provider Code
 
@@ -173,7 +173,7 @@ be passed to Secrets Manager.
 files) as part of a Terraform apply. Useful when downstream tools need a file that
 references Terraform-managed resources.
 
----
+
 
 ## Five Original Practice Questions
 
@@ -194,7 +194,7 @@ any API calls to AWS. The real bucket continues to exist. On the next `terraform
 Terraform will not show the bucket because it is no longer in state — but the bucket
 is still there.
 
----
+
 
 **Question 2**
 
@@ -212,7 +212,7 @@ Terraform compares the state file (which still shows the instance) against the r
 infrastructure (where the instance no longer exists). It detects the drift and plans
 to create the instance to match the desired configuration.
 
----
+
 
 **Question 3**
 
@@ -233,7 +233,7 @@ book recommends directory isolation for production environments because it makes
 differences between environments explicit in code rather than hidden in workspace
 selection.
 
----
+
 
 **Question 4**
 
@@ -251,7 +251,7 @@ When `count = 0`, the resource does not exist. Referencing it directly without i
 notation causes a plan-time error. The correct pattern is:
 `value = var.enable_feature ? aws_resource.example[0].arn : null`
 
----
+
 
 **Question 5**
 
@@ -270,7 +270,7 @@ of whether the configuration has changed. This is the modern replacement for the
 deprecated `terraform taint` command. Use it when a resource is in a broken state
 that Terraform does not detect as a configuration drift.
 
----
+
 
 ## Official Practice Question Results
 
@@ -283,7 +283,7 @@ Topics I needed to review after the sample questions:
 - The difference between `sensitive = true` on a variable vs on an output — both
   hide the value from terminal output but neither encrypts the state file
 
----
+
 
 ## Chapter Learnings
 
