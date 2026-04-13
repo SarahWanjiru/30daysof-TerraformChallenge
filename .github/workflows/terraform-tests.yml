@@ -3,13 +3,15 @@ name: Terraform Tests
 on:
   pull_request:
     branches: [main]
-  push:
+  pull_request_target:
+    types: [closed]
     branches: [main]
 
 jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
 
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -35,6 +37,7 @@ jobs:
     name: Validate and Plan
     runs-on: ubuntu-latest
     needs: unit-tests
+    if: github.event_name == 'pull_request'
 
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -67,12 +70,12 @@ jobs:
         env:
           TF_VAR_db_secret_name: "day13/db/credentials"
 
-  # integration tests only run on push to main (after PR is merged)
-  # not on every PR — too slow and costly for every commit
+  # integration tests only run when a PR is merged to main
+  # not on direct pushes, not on every PR open
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.merged == true
     needs: unit-tests
 
     env:

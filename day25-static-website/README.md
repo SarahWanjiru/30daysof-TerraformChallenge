@@ -2,12 +2,15 @@
 
 ## What I Did Today
 
-Built a fully modular, production-grade static website deployment using S3 and
-CloudFront. Applied every best practice from the last 24 days simultaneously —
-modular code, remote state, DRY configuration, environment isolation, version
-control, and consistent tagging.
+Built a fully modular static website deployment using S3 and CloudFront. Applied every
+best practice from the last 24 days simultaneously — modular code, remote state, DRY
+configuration, environment isolation, version control, and consistent tagging.
 
----
+CloudFront failed due to an AWS account-level restriction (separate from general account
+verification — see the CloudFront section below). The S3 website deployed successfully
+and is live.
+
+
 
 ## Project Directory Tree
 
@@ -28,7 +31,7 @@ day25-static-website/
 │       └── provider.tf
 ```
 
----
+
 
 ## Module Code
 
@@ -38,7 +41,7 @@ day25-static-website/
 variable "bucket_name" {
   description = "Globally unique name for the S3 bucket"
   type        = string
-  # no default — caller must provide a unique name, S3 bucket names are global
+  # no default — S3 bucket names are globally unique across all AWS accounts
 }
 
 variable "environment" {
@@ -55,7 +58,6 @@ variable "tags" {
   description = "Additional tags to apply to all resources"
   type        = map(string)
   default     = {}
-  # default is empty map — caller can add tags without being forced to
 }
 
 variable "index_document" {
@@ -72,12 +74,12 @@ variable "error_document" {
 ```
 
 **Why each variable has or does not have a default:**
-- `bucket_name` — no default. S3 bucket names are globally unique across all AWS accounts. The caller must choose a unique name — the module cannot know what is available.
-- `environment` — no default. Has a validation block instead. Forces the caller to be explicit.
+- `bucket_name` — no default. S3 bucket names are globally unique. The module cannot know what names are available.
+- `environment` — no default. Has a validation block instead — forces the caller to be explicit.
 - `tags` — defaults to empty map. Caller can add tags but is not required to.
-- `index_document` and `error_document` — sensible defaults. Most websites use `index.html` and `error.html`.
+- `index_document` / `error_document` — sensible defaults. Most websites use these names.
 
----
+
 
 ### modules/s3-static-website/main.tf
 
@@ -125,6 +127,8 @@ resource "aws_s3_bucket_policy" "website" {
   depends_on = [aws_s3_bucket_public_access_block.website]
 }
 
+# CloudFront distribution — requires AWS account CloudFront approval
+# See CloudFront section below for why this was removed from the active deployment
 resource "aws_cloudfront_distribution" "website" {
   enabled             = true
   default_root_object = var.index_document
@@ -207,8 +211,8 @@ output "bucket_name" {
 }
 
 output "website_endpoint" {
-  value       = aws_s3_bucket_website_configuration.website.website_endpoint
-  description = "S3 website endpoint"
+  value       = "http://${aws_s3_bucket_website_configuration.website.website_endpoint}"
+  description = "S3 website endpoint — open this in your browser"
 }
 
 output "cloudfront_domain_name" {
@@ -222,7 +226,7 @@ output "cloudfront_distribution_id" {
 }
 ```
 
----
+
 
 ## Calling Configuration
 
@@ -247,7 +251,7 @@ module "static_website" {
 ### envs/dev/terraform.tfvars
 
 ```hcl
-bucket_name    = "my-terraform-challenge-website-dev-unique123"
+bucket_name    = "sarahcodes-static-website-day25-2026"
 environment    = "dev"
 index_document = "index.html"
 error_document = "error.html"
@@ -255,57 +259,73 @@ error_document = "error.html"
 
 **Why the calling configuration stays clean:**
 
-The `envs/dev/main.tf` has 13 lines. It calls the module and passes values. All the
+`envs/dev/main.tf` is 13 lines. It calls the module and passes values. All the
 complexity — S3 bucket creation, public access configuration, bucket policy, CloudFront
 distribution, HTML file uploads — lives in the module. The caller does not need to know
 any of that. This is the DRY principle in practice.
 
----
+
 
 ## Deployment Output
 
 ```
-Apply complete! Resources: 7 added, 0 changed, 0 destroyed.
+Apply complete! Resources: 6 added, 0 changed, 0 destroyed.
 
 Outputs:
 
-bucket_name                = "sarahcodes-terraform-challenge-website-day25"
-website_endpoint           = "sarahcodes-terraform-challenge-website-day25.s3-website-us-east-1.amazonaws.com"
-cloudfront_domain_name     = (error — see below)
-cloudfront_distribution_id = (error — see below)
+bucket_name      = "sarahcodes-static-website-day25-2026"
+website_endpoint = "http://sarahcodes-static-website-day25-2026.s3-website.eu-north-1.amazonaws.com"
 ```
 
-**CloudFront Error:**
+Note: 6 resources deployed (CloudFront removed — see below). Full 7-resource deployment
+including CloudFront is the intended final state once account approval is received.
 
+
+
+## Live Website Confirmation
+
+Accessed the S3 website endpoint in the browser:
+
+`http://sarahcodes-static-website-day25-2026.s3-website.eu-north-1.amazonaws.com`
+
+Saw:
+```
+Deployed with Terraform
+Environment: dev
+Bucket: sarahcodes-static-website-day25-2026
+```
+
+The website is live and publicly accessible via the S3 endpoint.
+
+
+
+## CloudFront — Why It Failed and What It Means
+
+**The error:**
 ```
 Error: creating CloudFront Distribution: AccessDenied: Your account must be
 verified before you can add new CloudFront resources.
 ```
 
-The S3 bucket, website configuration, public access block, bucket policy, and HTML
-files were all created successfully. CloudFront failed because the AWS account requires
-verification before creating CloudFront distributions. This is an account-level
-restriction, not a code issue.
+**Why this is confusing:** This account has been used for 25 days of infrastructure
+deployments — EC2, ALB, EKS, S3, RDS. All of those worked. So why does CloudFront fail?
 
-**S3 website is live at:**
-`http://sarahcodes-terraform-challenge-website-day25.s3-website-us-east-1.amazonaws.com`
+**The answer:** AWS has two separate verification levels:
 
----
+1. **Basic account verification** — covers EC2, S3, ALB, EKS, and most services.
+   This account passed this when it was created.
 
-## Live Website Confirmation
+2. **CloudFront-specific verification** — AWS requires separate manual approval before
+   new accounts can create CloudFront distributions. This is an anti-abuse measure
+   because CloudFront can serve content globally at massive scale, which bad actors
+   use for DDoS attacks and illegal content distribution. AWS manually reviews accounts
+   before enabling it.
 
-Accessed the S3 website endpoint in the browser and saw:
+**The code is correct.** The CloudFront Terraform resource block will work perfectly
+on an account that has been approved. To request approval:
+AWS Support → Create Case → Service Limit Increase → CloudFront.
 
-```
-Deployed with Terraform
-Environment: dev
-Bucket: sarahcodes-terraform-challenge-website-day25
-```
 
-The website is live and publicly accessible via the S3 endpoint. CloudFront would add
-HTTPS and global CDN caching once the account verification is complete.
-
----
 
 ## DRY Principle in Practice
 
@@ -313,49 +333,79 @@ HTTPS and global CDN caching once the account verification is complete.
 
 `envs/dev/main.tf` — 13 lines. Calls the module, passes 4 variables.
 
+To add a staging environment: create `envs/staging/main.tf` — 13 lines with different
+values. The infrastructure logic is not duplicated.
+
 **Without the module (flat file):**
 
-Everything would be in one file — S3 bucket, website configuration, public access
-block, bucket policy, IAM policy document, CloudFront distribution with all its nested
-blocks, two S3 objects. Approximately 150+ lines. If you wanted a staging environment,
-you would copy all 150 lines and change the bucket name and environment value.
+Everything in one file — S3 bucket, website configuration, public access block, bucket
+policy, IAM policy document, CloudFront distribution with all nested blocks, two S3
+objects. Approximately 150+ lines. To add staging, copy all 150 lines and change two
+values. Any bug fix must be applied in every environment separately.
 
-**With the module:**
+**The DRY principle:** Write the infrastructure logic once. Reuse it everywhere.
 
-Add `envs/staging/main.tf` — 13 lines. Call the same module with different values.
-The 150 lines of infrastructure logic are written once and reused everywhere.
 
----
+
+## Bonus — Route53 Custom Domain
+
+Route53 configuration for pointing a custom domain to CloudFront (requires CloudFront
+to be active and an ACM certificate in us-east-1):
+
+```hcl
+data "aws_route53_zone" "primary" {
+  name = var.domain_name
+}
+
+resource "aws_route53_record" "website" {
+  zone_id = data.aws_route53_zone.primary.zone_id
+  name    = var.domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.website.domain_name
+    zone_id                = aws_cloudfront_distribution.website.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+```
+
+This was not deployed because CloudFront is pending account approval. Will be
+implemented once CloudFront is enabled.
+
+
+
+## Cleanup Confirmation
+
+```
+Destroy complete! Resources: 6 destroyed.
+```
+
+All S3 objects, bucket policy, public access block, website configuration, and S3
+bucket were destroyed. `force_destroy = true` on the bucket (because `environment = "dev"`)
+allowed Terraform to delete the bucket even with objects inside.
+
+Post-destroy verification:
+
+```bash
+aws s3 ls | grep day25
+# returns nothing — bucket deleted
+```
+
+
 
 ## Challenges and Fixes
 
-**CloudFront AccessDenied — account verification required:**
-AWS requires account verification before creating CloudFront distributions on new
-accounts. The S3 website works without CloudFront. CloudFront adds HTTPS and global
-CDN — will be added once account is verified.
-
-**VS Code showing variable errors in main.tf:**
-The linter was reading `main.tf` in isolation without seeing `variables.tf` in the
-same directory. Not a real error — `terraform validate` passes cleanly.
-
 **backend.tf and provider.tf in wrong location:**
-Initially placed in the project root instead of `envs/dev/`. Terraform only reads
-files from the directory you run it from. Moved both files into `envs/dev/`.
+Initially placed in the project root. Terraform only reads files from the directory
+you run it from. Fixed by moving both into `envs/dev/`.
 
----
+**VS Code variable errors:**
+The linter read `main.tf` in isolation without seeing `variables.tf`. Not a real error
+— `terraform validate` passes cleanly.
 
-## Blog Post
+**CloudFront AccessDenied:**
+AWS requires separate manual approval for CloudFront on new accounts. The code is
+correct. Removed CloudFront from the active deployment. Will re-add once approved via
+AWS Support → Service Limit Increase → CloudFront.
 
-URL: *(paste blog URL here)*
-
----
-
-## Social Media
-
-URL: *(paste post URL here)*
-
-> 🚀 Day 25 of the 30-Day Terraform Challenge — deployed a fully modular, globally
-> distributed static website on AWS S3 + CloudFront using Terraform. Remote state,
-> DRY modules, environment isolation, consistent tagging. Everything from the last
-> 24 days in one project. #30DayTerraformChallenge #TerraformChallenge #Terraform
-> #AWS #CloudFront #IaC #AWSUserGroupKenya #EveOps
