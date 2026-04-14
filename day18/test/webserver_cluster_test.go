@@ -33,13 +33,33 @@ func TestWebserverClusterIntegration(t *testing.T) {
 	})
 
 	// defer guarantees destroy runs even if assertions fail
-	// without this, a failed test leaves real AWS resources running and incurring cost
-	defer terraform.Destroy(t, terraformOptions)
+	// Important: Scale down ASG to 0 before destroying to prevent ASG from launching new instances
+	// while cleanup is in progress
+	defer func() {
+		t.Log("Scaling down ASG to 0 before destroying resources...")
+		terraform.Apply(t, &terraform.Options{
+			TerraformDir: terraformOptions.TerraformDir,
+			Vars: map[string]interface{}{
+				"cluster_name":   terraformOptions.Vars["cluster_name"],
+				"instance_type":  terraformOptions.Vars["instance_type"],
+				"min_size":       0,
+				"max_size":       0,
+				"environment":    terraformOptions.Vars["environment"],
+				"project_name":   terraformOptions.Vars["project_name"],
+				"team_name":      terraformOptions.Vars["team_name"],
+				"db_secret_name": terraformOptions.Vars["db_secret_name"],
+			},
+		})
+		t.Log("Destroying resources...")
+		terraform.Destroy(t, terraformOptions)
+	}()
 
+	t.Log("Initializing and applying Terraform configuration...")
 	terraform.InitAndApply(t, terraformOptions)
 
 	albDnsName := terraform.Output(t, terraformOptions, "alb_dns_name")
 	url := fmt.Sprintf("http://%s", albDnsName)
+	t.Logf("Testing ALB endpoint: %s", url)
 
 	// retry for up to 5 minutes — ALB takes time to register instances and pass health checks
 	http_helper.HttpGetWithRetryWithCustomValidation(
