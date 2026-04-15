@@ -31,6 +31,38 @@ resource "aws_security_group" "instancesg" {
         protocol = "-1"
         cidr_blocks = ["0.0.0.0/0"]
     }
+    tags = local.common_tags
 }
+
+resource "aws_launch_template" "web" {
+    name_prefix = "web-lt-${var.environment} "
+    image_id = var.ami_id
+    instance_type = var.instance_type
+    key_name = var.key_name
+
+    vpc_security_group_ids = [aws_security_group.instancesg.id]
+
+    user_data = base64decode(<<-USERDATA
+        #!/bin/bash
+        yum update -y
+        yum install -y httpd
+        systemctl start httpd
+        systemctl enable httpd
+        echo "<h1>Deployed by sarahcancode with Terraform - ${var.environment} ${var.environment} environment.</h1>" > /var/www/html/index.html
+        USERDATA
+    )
+
+
+    tag_specifications {
+      resource_type = "instance"
+      tags          = merge(local.common_tags, {Name = "web-${var.environment}"})
+    }
+
+
+    lifecycle {
+      create_before_destroy = true
+    }
+}
+
 
 
