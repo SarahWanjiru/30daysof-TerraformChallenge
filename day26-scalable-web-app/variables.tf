@@ -42,8 +42,3 @@ variable "desired_capacity" {
   description = "Desired capacity of the auto scaling group"
   type        = number
 }
-
-variable "instance_type" {
-  description = "The instance type for EC2 instances"
-  type        = string
-}
