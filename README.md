@@ -1,6 +1,6 @@
 # 30 Days of Terraform Challenge
 
-A 25-day hands-on Terraform challenge covering everything from first EC2 instance to production-grade infrastructure, automated testing, multi-cloud deployments, and Terraform Associate exam preparation.
+A 26-day hands-on Terraform challenge covering everything from first EC2 instance to production-grade infrastructure, automated testing, multi-cloud deployments, and Terraform Associate exam preparation.
 
 
 ## What This Repository Contains
@@ -38,20 +38,24 @@ Each day folder contains:
 | [Day 22](./day22/) | Putting It All Together | Integrated pipeline, Sentinel, cost estimation, journey reflection |
 | [Day 23](./day23/) | Exam Preparation | Domain audit, CLI commands, practice questions, study plan |
 | [Day 24](./day24/) | Final Exam Review | Simulation score 121/200, flash cards, exam-day strategy |
+| [Day 25](./day25-static-website/) | Static Website on S3 | S3 static hosting, CloudFront CDN, modular design, DRY principle |
+| [Day 26](./day26-scalable-web-app/) | Scalable Web Application with Auto Scaling | EC2 Launch Templates, ALB, ASG, CloudWatch monitoring, modular architecture |
 
 
 
 ## Infrastructure Built
 
-Over 24 days this repository deployed and destroyed:
+Over 26 days this repository deployed and destroyed:
 
 - EC2 instances, security groups, VPCs
 - Auto Scaling Groups with ELB health checks and blue/green target groups
 - Application Load Balancers with zero-downtime deployment patterns
+- **Static Website Infrastructure** — S3 static hosting with CloudFront CDN (Day 25)
+- **Modular Auto Scaling Architecture** — Three-module design (EC2, ALB, ASG) with CloudWatch monitoring
 - Multi-region S3 replication (eu-north-1 → eu-west-1)
 - Docker containers managed by Terraform
 - A full EKS cluster with Kubernetes nginx deployment
-- CloudWatch alarms, SNS topics, CloudWatch log groups
+- CloudWatch alarms, SNS topics, CloudWatch log groups, **CloudWatch dashboards**
 - AWS Secrets Manager secrets and data source integration
 - Terraform state infrastructure — S3 + DynamoDB
 - Multi-provider modules with configuration_aliases
@@ -74,7 +78,8 @@ See [`.github/workflows/`](./.github/workflows/) for the full pipeline configura
 
 ## Module Structure
 
-The production-grade webserver cluster module evolved across Days 8–22:
+### Production-Grade Webserver Cluster (Days 8-22)
+The webserver cluster module evolved across Days 8–22:
 
 ```
 modules/services/webserver-cluster/
@@ -83,7 +88,7 @@ modules/services/webserver-cluster/
 └── outputs.tf     # all outputs including sensitive values
 ```
 
-Key features built into the module:
+Key features:
 - `create_before_destroy` on Launch Template and ASG
 - `name_prefix` for unique resource names per deploy
 - `common_tags` with `merge()` applied to every resource
@@ -91,6 +96,39 @@ Key features built into the module:
 - `sensitive = true` on database credentials
 - IMDSv2 enforced via `metadata_options`
 - CloudWatch log group with 30-day retention
+
+### Modular Auto Scaling Architecture (Day 26)
+Three-module separation of concerns:
+
+```
+day26-scalable-web-app/modules/
+├── ec2/     # Launch Template + Security Group
+├── alb/     # Load Balancer + Target Group + Listener
+└── asg/     # Auto Scaling + Policies + CloudWatch
+```
+
+Key features:
+- **Data Flow Integration**: `module.ec2.launch_template_id` → ASG, `module.alb.target_group_arn` → ASG
+- **CPU-Based Scaling**: 70% scale-out, 30% scale-in thresholds
+- **ELB Health Checks**: `health_check_type = "ELB"` for application-level health
+- **CloudWatch Dashboard**: Real-time monitoring with threshold annotations
+- **Security Hardening**: Header injection prevention, least-privilege security groups
+
+### Static Website Module (Day 25)
+S3 static website hosting with CloudFront CDN:
+
+```
+day25-static-website/modules/s3-static-website/
+├── main.tf      # S3 bucket, website config, CloudFront, IAM policy
+├── variables.tf # Bucket name, environment, documents
+└── outputs.tf   # Website endpoint, CloudFront domain
+```
+
+Key features:
+- **Global CDN**: CloudFront distribution for worldwide content delivery
+- **Public Access**: S3 bucket policy for public read access
+- **Environment Isolation**: Dev/staging/production configurations
+- **DRY Principle**: 13-line calling configuration vs 150+ line flat file
 
 
 
@@ -111,6 +149,8 @@ Three Sentinel policies in [`day22/sentinel/`](./day22/sentinel/):
 **The mental model shift:** Infrastructure is something you test, not just configure. Every change has a blast radius. The first question before any apply is not "will this work?" — it is "what breaks if this fails halfway through?"
 
 **State is not infrastructure.** Every state command (`state rm`, `state mv`, `import`) operates on the record, not on real AWS resources. Only `apply` and `destroy` touch real infrastructure.
+
+**Modular architecture enables scale.** Day 26 proved that splitting complex infrastructure into focused modules creates maintainable, reusable, and testable code. Three modules (EC2, ALB, ASG) working together through clean interfaces is more powerful than monolithic configurations.
 
 
 
