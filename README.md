@@ -154,10 +154,6 @@ Three Sentinel policies in [`day22/sentinel/`](./day22/sentinel/):
 
 
 
-## Exam Score
-
-Terraform Associate knowledge assessment: **121/200 — Established range, better than 66% of assessed learners.**
-
 
 
 ## Blog Posts
