@@ -99,10 +99,27 @@ resource "aws_cloudwatch_dashboard" "web" {
         widgets = [
             {
                 type = "metric"
+                x = 0
+                y = 0
+                width = 12
+                height = 6
                 properties = {
                     title = "CPU Utilization"
-                    period = 60
+                    period = 300
                     stat = "Average"
+                    region = data.aws_region.current.id
+                    annotations = {
+                        horizontal = [
+                            {
+                                label = "Scale Out Threshold"
+                                value = var.cpu_scale_out_threshold
+                            },
+                            {
+                                label = "Scale In Threshold"
+                                value = var.cpu_scale_in_threshold
+                            }
+                        ]
+                    }
                     metrics = [
                         ["AWS/EC2", "CPUUtilization", "AutoScalingGroupName", aws_autoscaling_group.web.name]
                     ]
@@ -110,10 +127,23 @@ resource "aws_cloudwatch_dashboard" "web" {
             },
             {
                 type = "metric"
+                x = 0
+                y = 6
+                width = 12
+                height = 6
                 properties = {
                     title = "ASG Instance Count"
-                    period = 60
+                    period = 300
                     stat = "Average"
+                    region = data.aws_region.current.id
+                    annotations = {
+                        horizontal = [
+                            {
+                                label = "Desired Capacity"
+                                value = var.desired_capacity
+                            }
+                        ]
+                    }
                     metrics = [
                         ["AWS/AutoScaling", "GroupInServiceInstances", "AutoScalingGroupName", aws_autoscaling_group.web.name]
                     ]

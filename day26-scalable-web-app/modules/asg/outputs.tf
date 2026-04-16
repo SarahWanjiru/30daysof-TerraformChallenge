@@ -19,6 +19,6 @@ output "scaling_policy_in_arn" {
 }
 
 output "dashboard_url" {
-    value = "https://console.aws.amazon.com/cloudwatch/home?region=${data.aws_region.current.name}#dashboards:name=${aws_cloudwatch_dashboard.web.dashboard_name}"
+    value = "https://console.aws.amazon.com/cloudwatch/home?region=${data.aws_region.current.id}#dashboards:name=${aws_cloudwatch_dashboard.web.dashboard_name}"
     description = "URL to the CloudWatch dashboard for monitoring ASG metrics"
 }
