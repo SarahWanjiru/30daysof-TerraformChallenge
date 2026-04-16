@@ -76,5 +76,22 @@ resource "aws_lb_listener" "http" {
         target_group_arn = aws_lb_target_group.tg.arn
     }
 }
+
+resource "aws_cloudwatch_metric_alarm" "high_request_count" {
+    alarm_name = "${var.name}-high-requests-${var.environment}"
+    comparison_operator = "GreaterThanOrEqualToThreshold"
+    evaluation_periods = 1
+    metric_name = "RequestCountPerTarget"
+    namespace = "AWS/ApplicationELB"
+    period = 60
+    statistic = "Sum"
+    threshold = 1000
+
+    dimensions = {
+        TargetGroup = aws_lb_target_group.tg.arn_suffix
+    }
+
+    alarm_description = "High request count per target — consider scaling"
+}
     
   

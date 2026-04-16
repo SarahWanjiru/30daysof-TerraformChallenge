@@ -12,3 +12,8 @@ output "launch_template_id" {
   description = "ID of the EC2 Launch Template"
   value       = module.ec2.launch_template_id
 }
+
+output "dashboard_url" {
+  description = "CloudWatch Dashboard URL for monitoring ASG metrics"
+  value       = module.asg.dashboard_url
+}

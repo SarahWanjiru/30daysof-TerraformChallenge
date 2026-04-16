@@ -1,3 +1,5 @@
+data "aws_region" "current" {}
+
 locals {
     common_tags = merge(var.tags, {
         Environment = var.environment
@@ -13,6 +15,7 @@ resource "aws_autoscaling_group" "web" {
     desired_capacity = var.desired_capacity
     vpc_zone_identifier = var.subnet_ids
     target_group_arns = var.target_group_arns
+    force_delete = var.environment != "production"
 
     launch_template {
         id = var.launch_template_id
@@ -87,4 +90,35 @@ resource "aws_cloudwatch_metric_alarm" "cpu_low" {
 
     alarm_description = "Scale in when average CPU is <= ${var.cpu_scale_in_threshold}%"
     alarm_actions = [aws_autoscaling_policy.cpu_scale_in.arn]
+}
+
+resource "aws_cloudwatch_dashboard" "web" {
+    dashboard_name = "web-asg-${var.environment}"
+
+    dashboard_body = jsonencode({
+        widgets = [
+            {
+                type = "metric"
+                properties = {
+                    title = "CPU Utilization"
+                    period = 60
+                    stat = "Average"
+                    metrics = [
+                        ["AWS/EC2", "CPUUtilization", "AutoScalingGroupName", aws_autoscaling_group.web.name]
+                    ]
+                }
+            },
+            {
+                type = "metric"
+                properties = {
+                    title = "ASG Instance Count"
+                    period = 60
+                    stat = "Average"
+                    metrics = [
+                        ["AWS/AutoScaling", "GroupInServiceInstances", "AutoScalingGroupName", aws_autoscaling_group.web.name]
+                    ]
+                }
+            }
+        ]
+    })
 }

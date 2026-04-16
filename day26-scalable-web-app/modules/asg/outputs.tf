@@ -17,3 +17,8 @@ output "scaling_policy_in_arn" {
     value = aws_autoscaling_policy.cpu_scale_in.arn
     description = "ARN of the CPU scale-in policy for the Auto Scaling Group"
 }
+
+output "dashboard_url" {
+    value = "https://console.aws.amazon.com/cloudwatch/home?region=${data.aws_region.current.name}#dashboards:name=${aws_cloudwatch_dashboard.web.dashboard_name}"
+    description = "URL to the CloudWatch dashboard for monitoring ASG metrics"
+}
