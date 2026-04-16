@@ -11,7 +11,7 @@ resource "aws_security_group" "albsg" {
     description = "Allow HTTP/HTTPS inbound to ALB"
     vpc_id = var.vpc_id
 
-    ingress = {
+    ingress {
         from_port = 80
         to_port = 80
         protocol = "tcp"
@@ -26,7 +26,7 @@ resource "aws_security_group" "albsg" {
     }
 
 
-     egress = {
+     egress {
         from_port = 0
         to_port = 0
         protocol = "-1"
@@ -43,6 +43,7 @@ resource "aws_lb" "alb" {
     load_balancer_type = "application"
     security_groups = [aws_security_group.albsg.id]
     subnets = var.subnet_ids
+    drop_invalid_header_fields = true
     tags = local.common_tags
 }
 

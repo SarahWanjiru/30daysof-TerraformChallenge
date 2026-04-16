@@ -37,13 +37,13 @@ variable "desired_capacity" {
 }
 
 variable "cpu_scale_out_threshold" {
-    description = "CPU utilization percentage to trigger scale-in"
+    description = "CPU utilization percentage to trigger scale-out"
     type = number
     default = 70
 }
 
 variable "cpu_scale_in_threshold" {
-    description = "CPU utilization percentage to trigger scale-out"
+    description = "CPU utilization percentage to trigger scale-in"
     type = number
     default = 30
 }

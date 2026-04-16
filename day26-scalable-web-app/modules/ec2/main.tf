@@ -7,7 +7,7 @@ locals {
 }
 
 resource "aws_security_group" "instancesg" {
-    name = " web-instance-sg-${var.environment}"
+    name = "web-instance-sg-${var.environment}"
     description = "Allow HTTP/HTTPS inbound to EC2 instances"
 
 
@@ -35,20 +35,20 @@ resource "aws_security_group" "instancesg" {
 }
 
 resource "aws_launch_template" "web" {
-    name_prefix = "web-lt-${var.environment} "
+    name_prefix = "web-lt-${var.environment}-"
     image_id = var.ami_id
     instance_type = var.instance_type
     key_name = var.key_name
 
     vpc_security_group_ids = [aws_security_group.instancesg.id]
 
-    user_data = base64decode(<<-USERDATA
+    user_data = base64encode(<<-USERDATA
         #!/bin/bash
-        yum update -y
-        yum install -y httpd
+        dnf update -y
+        dnf install -y httpd
         systemctl start httpd
         systemctl enable httpd
-        echo "<h1>Deployed by sarahcancode with Terraform - ${var.environment} ${var.environment} environment.</h1>" > /var/www/html/index.html
+        echo "<h1>Deployed by sarahcancode with Terraform - ${var.environment} environment.</h1>" > /var/www/html/index.html
         USERDATA
     )
 
