@@ -14,11 +14,7 @@ output "primary_rds_endpoint" {
   sensitive   = true
 }
 
-output "secondary_rds_endpoint" {
-  description = "Secondary RDS read replica endpoint"
-  value       = module.rds_replica.db_endpoint
-  sensitive   = true
-}
+# secondary_rds_endpoint not available - see rds_replica comment in main.tf
 
 # Uncomment if you enable Route53
 # output "application_url" {

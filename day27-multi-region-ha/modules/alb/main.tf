@@ -45,7 +45,7 @@ resource "aws_security_group" "alb" {
 }
 
 resource "aws_lb" "web" {
-  name               = "${var.name}-alb-${var.region}"
+  name               = "${var.name}-alb-${substr(var.region, 0, 6)}"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
@@ -54,7 +54,7 @@ resource "aws_lb" "web" {
 }
 
 resource "aws_lb_target_group" "web" {
-  name     = "${var.name}-tg-${var.region}"
+  name     = "${var.name}-tg-${substr(var.region, 0, 6)}"
   port     = 80
   protocol = "HTTP"
   vpc_id   = var.vpc_id

@@ -56,7 +56,7 @@ resource "aws_db_instance" "main" {
   vpc_security_group_ids  = [aws_security_group.rds.id]
   multi_az                = var.is_replica ? false : var.multi_az
   replicate_source_db     = var.is_replica ? var.replicate_source_db : null
-  backup_retention_period = var.is_replica ? 0 : 7
+  backup_retention_period = 0
   skip_final_snapshot     = true
   storage_encrypted       = true
   publicly_accessible     = false

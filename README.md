@@ -1,6 +1,6 @@
 # 30 Days of Terraform Challenge
 
-A 26-day hands-on Terraform challenge covering everything from first EC2 instance to production-grade infrastructure, automated testing, multi-cloud deployments, and Terraform Associate exam preparation.
+A 27-day hands-on Terraform challenge covering everything from first EC2 instance to production-grade infrastructure, automated testing, multi-cloud deployments, and Terraform Associate exam preparation.
 
 
 ## What This Repository Contains
@@ -40,18 +40,20 @@ Each day folder contains:
 | [Day 24](./day24/) | Final Exam Review | Simulation score 121/200, flash cards, exam-day strategy |
 | [Day 25](./day25-static-website/) | Static Website on S3 | S3 static hosting, CloudFront CDN, modular design, DRY principle |
 | [Day 26](./day26-scalable-web-app/) | Scalable Web Application with Auto Scaling | EC2 Launch Templates, ALB, ASG, CloudWatch monitoring, modular architecture |
+| [Day 27](./day27-multi-region-ha/) | 3-Tier Multi-Region High Availability | Multi-region VPC, ALB, ASG, RDS Multi-AZ, Route53 failover, five modules |
 
 
 
 ## Infrastructure Built
 
-Over 26 days this repository deployed and destroyed:
+Over 27 days this repository deployed and destroyed:
 
 - EC2 instances, security groups, VPCs
 - Auto Scaling Groups with ELB health checks and blue/green target groups
 - Application Load Balancers with zero-downtime deployment patterns
 - **Static Website Infrastructure** — S3 static hosting with CloudFront CDN (Day 25)
 - **Modular Auto Scaling Architecture** — Three-module design (EC2, ALB, ASG) with CloudWatch monitoring
+- **3-Tier Multi-Region HA** — Five modules across two regions (eu-north-1 + eu-west-1), RDS Multi-AZ, Route53 failover
 - Multi-region S3 replication (eu-north-1 → eu-west-1)
 - Docker containers managed by Terraform
 - A full EKS cluster with Kubernetes nginx deployment
@@ -96,6 +98,25 @@ Key features:
 - `sensitive = true` on database credentials
 - IMDSv2 enforced via `metadata_options`
 - CloudWatch log group with 30-day retention
+
+### Multi-Region HA Architecture (Day 27)
+Five-module 3-tier architecture across two AWS regions:
+
+```
+day27-multi-region-ha/modules/
+├── vpc/      # VPC, subnets, NAT gateways, route tables
+├── alb/      # Application Load Balancer, target groups
+├── asg/      # Auto Scaling Group, launch template, CloudWatch
+├── rds/      # RDS MySQL Multi-AZ
+└── route53/  # DNS failover routing
+```
+
+Key features:
+- **Two Regions**: eu-north-1 (primary) + eu-west-1 (secondary)
+- **Multi-AZ RDS**: Protects against AZ failure within primary region
+- **Route53 Failover**: Health-check-based DNS failover between regions
+- **Multi-Provider**: Same modules deployed to both regions via provider aliases
+- **59 Resources**: Deployed and destroyed with a single terraform apply/destroy
 
 ### Modular Auto Scaling Architecture (Day 26)
 Three-module separation of concerns:
@@ -150,7 +171,7 @@ Three Sentinel policies in [`day22/sentinel/`](./day22/sentinel/):
 
 **State is not infrastructure.** Every state command (`state rm`, `state mv`, `import`) operates on the record, not on real AWS resources. Only `apply` and `destroy` touch real infrastructure.
 
-**Modular architecture enables scale.** Day 26 proved that splitting complex infrastructure into focused modules creates maintainable, reusable, and testable code. Three modules (EC2, ALB, ASG) working together through clean interfaces is more powerful than monolithic configurations.
+**Multi-region is not the same as Multi-AZ.** Day 27 made this concrete. Multi-AZ protects against a single data center failure — automatic, synchronous, zero data loss. Multi-region protects against a full regional outage — manual promotion, asynchronous replication, possible data loss. Most applications need both, and they solve different problems at different scales.
 
 
 

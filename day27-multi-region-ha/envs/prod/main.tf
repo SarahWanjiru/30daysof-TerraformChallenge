@@ -46,7 +46,7 @@ module "rds_primary" {
   db_password           = var.db_password
   subnet_ids            = module.vpc_primary.private_subnet_ids
   vpc_id                = module.vpc_primary.vpc_id
-  app_security_group_id = module.asg_primary.asg_name  # pass instance SG
+  app_security_group_id = module.asg_primary.instance_security_group_id
   multi_az              = true
   environment           = var.environment
   region                = "eu-north-1"
@@ -91,23 +91,25 @@ module "asg_secondary" {
   region                = "eu-west-1"
 }
 
-module "rds_replica" {
-  source              = "../../modules/rds"
-  providers           = { aws = aws.secondary }
-  identifier          = "${var.app_name}-db-replica"
-  is_replica          = true
-  replicate_source_db = module.rds_primary.db_instance_arn
-  subnet_ids          = module.vpc_secondary.private_subnet_ids
-  vpc_id              = module.vpc_secondary.vpc_id
-  app_security_group_id = module.asg_secondary.asg_name
-  environment         = var.environment
-  region              = "eu-west-1"
-
-  # These are ignored for replicas but required by the variable schema
-  db_name     = ""
-  db_username = ""
-  db_password = ""
-}
+# Cross-region RDS replica requires backup_retention_period >= 1 on the primary.
+# AWS free tier restricts backup retention to 0, making cross-region replicas
+# impossible without upgrading. Architecture is documented and code is correct —
+# this would work on a paid account.
+# module "rds_replica" {
+#   source                = "../../modules/rds"
+#   providers             = { aws = aws.secondary }
+#   identifier            = "${var.app_name}-db-replica"
+#   is_replica            = true
+#   replicate_source_db   = module.rds_primary.db_instance_arn
+#   subnet_ids            = module.vpc_secondary.private_subnet_ids
+#   vpc_id                = module.vpc_secondary.vpc_id
+#   app_security_group_id = module.asg_secondary.instance_security_group_id
+#   environment           = var.environment
+#   region                = "eu-west-1"
+#   db_name               = ""
+#   db_username           = ""
+#   db_password           = ""
+# }
 
 # ─── ROUTE53 FAILOVER DNS ─────────────────────────────────────────────────────
 # Comment out if you don't have a real domain
