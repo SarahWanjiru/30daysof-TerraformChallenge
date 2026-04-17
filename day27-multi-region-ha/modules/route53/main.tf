@@ -1,3 +1,11 @@
+terraform {
+  required_providers {
+    aws = {
+      source = "hashicorp/aws"
+    }
+  }
+}
+
 resource "aws_route53_health_check" "primary" {
   fqdn              = var.primary_alb_dns_name
   port              = 80

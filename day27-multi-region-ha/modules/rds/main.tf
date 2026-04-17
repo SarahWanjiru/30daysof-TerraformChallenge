@@ -1,3 +1,11 @@
+terraform {
+  required_providers {
+    aws = {
+      source = "hashicorp/aws"
+    }
+  }
+}
+
 locals {
   common_tags = merge(var.tags, {
     Environment = var.environment
