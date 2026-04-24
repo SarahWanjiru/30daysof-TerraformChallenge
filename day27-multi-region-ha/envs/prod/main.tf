@@ -1,4 +1,4 @@
-# ─── PRIMARY REGION (eu-north-1) ───────────────────────────────────────────────
+#  PRIMARY REGION (eu-north-1) 
 
 module "vpc_primary" {
   source               = "../../modules/vpc"
@@ -52,7 +52,7 @@ module "rds_primary" {
   region                = "eu-north-1"
 }
 
-# ─── SECONDARY REGION (eu-west-1) ─────────────────────────────────────────────
+# SECONDARY REGION (eu-west-1) 
 
 module "vpc_secondary" {
   source               = "../../modules/vpc"
@@ -111,7 +111,7 @@ module "asg_secondary" {
 #   db_password           = ""
 # }
 
-# ─── ROUTE53 FAILOVER DNS ─────────────────────────────────────────────────────
+#  ROUTE53 FAILOVER DNS 
 # Comment out if you don't have a real domain
 
 # module "route53" {
